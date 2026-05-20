@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net11.0-windows</TargetFramework>
+        <RootNamespace>AI_Discord_Bot</RootNamespace>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <ApplicationIcon>mod_bot_avatar.ico</ApplicationIcon>
+        <Configurations>Release;Debug</Configurations>
+        <Platforms>x64</Platforms>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+      <DebugType>none</DebugType>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="LLamaSharp" Version="0.27.0" />
+      <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
+      <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+      <PackageReference Include="System.Management" Version="10.0.0" />
+      <PackageReference Include="SimpleDiscordDotNet" Version="1.10.10" />
+    </ItemGroup>
+
+    <Target Name="RemoveNonWindowsRuntimes" AfterTargets="Publish">
+        <ItemGroup>
+            <RuntimesToRemove Include="$(PublishDir)runtimes\linux-x64\**\*" />
+            <RuntimesToRemove Include="$(PublishDir)runtimes\osx-x64\**\*" />
+            <RuntimesToRemove Include="$(PublishDir)runtimes\osx-arm64\**\*" />
+            <RuntimesToRemove Include="$(PublishDir)runtimes\win-arm64\**\*" />
+        </ItemGroup>
+        <Delete Files="@(RuntimesToRemove)" />
+        <RemoveDir Directories="$(PublishDir)runtimes\linux-x64" />
+        <RemoveDir Directories="$(PublishDir)runtimes\osx-x64" />
+        <RemoveDir Directories="$(PublishDir)runtimes\osx-arm64" />
+        <RemoveDir Directories="$(PublishDir)runtimes\win-arm64" />
+    </Target>
+
+</Project>
