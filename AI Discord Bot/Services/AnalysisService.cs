@@ -1,5 +1,8 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using AI_Discord_Bot.Models;
 
 namespace AI_Discord_Bot.Services;
 
@@ -11,6 +14,7 @@ public class AnalysisService
     private readonly List<string> _enabledReportTypes;
     private string _customRules;
     private readonly List<RecentReport> _recentReports = [];
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _channelLastReportTimestamps = new();
 
     public string CustomRules
     {
@@ -19,7 +23,7 @@ public class AnalysisService
     }
     private const int MaxReportHistory = 20;
 
-    public event Action<string>? LogMessage;
+    public event Action<string, LogLevel>? LogMessage;
 
     public AnalysisService(
         MessageBufferService buffer,
@@ -42,14 +46,14 @@ public class AnalysisService
 
         if (channelIds.Count == 0)
         {
-            LogMessage?.Invoke("Cycle: No new messages to process.");
+            LogMessage?.Invoke("Cycle: No new messages to process.", LogLevel.Info);
             return;
         }
 
         var totalMessages = 0;
         var reportsSent = 0;
 
-        LogMessage?.Invoke($"Cycle start: {channelIds.Count} channel(s) with new messages, {_buffer.TotalMessageCount} total buffered");
+        LogMessage?.Invoke($"Cycle start: {channelIds.Count} channel(s) with new messages, {_buffer.TotalMessageCount} total buffered", LogLevel.Info);
 
         foreach (var channelId in channelIds)
         {
@@ -59,18 +63,18 @@ public class AnalysisService
             totalMessages += messages.Count;
 
             var channelName = messages[0].ChannelName;
-            var userPrompt = BuildUserPrompt(messages);
+            var userPrompt = BuildUserPrompt(messages, channelId);
             var systemPrompt = BuildSystemPrompt();
 
             try
             {
                 var response = await _llama.PromptAsync(systemPrompt, userPrompt);
                 var rawSample = response.Length > 300 ? response[..300] + "..." : response;
-                LogMessage?.Invoke($"#{channelName}: LLM response ({response.Length} chars): {rawSample.Replace("\n", "\\n")}");
+                LogMessage?.Invoke($"#{channelName}: LLM response ({response.Length} chars): {rawSample.Replace("\n", "\\n")}", LogLevel.Debug);
 
                 var result = ParseResponse(response);
                 LogMessage?.Invoke($"#{channelName}: Parsed → needsReport={result.NeedsReport}" +
-                                  (result.NeedsReport ? $", type={result.ReportType}, severity={result.Severity}" : ""));
+                                  (result.NeedsReport ? $", type={result.ReportType}, severity={result.Severity}" : ""), LogLevel.Debug);
 
                 if (result.NeedsReport)
                 {
@@ -82,37 +86,37 @@ public class AnalysisService
                     if (!string.IsNullOrWhiteSpace(reportChannelId))
                     {
                         try { await _discord.SendReportAsync(reportChannelId, title, description); }
-                        catch (Exception ex) { LogMessage?.Invoke($"#{channelName}: Failed to send report to channel — {ex.Message}"); }
+                        catch (Exception ex) { LogMessage?.Invoke($"#{channelName}: Failed to send report to channel — {ex.Message}", LogLevel.Error); }
                     }
 
                     if (!string.IsNullOrWhiteSpace(reportDmUserId))
                     {
                         try { await _discord.SendDmAsync(reportDmUserId, title, description); }
-                        catch (Exception ex) { LogMessage?.Invoke($"#{channelName}: Failed to send DM report — {ex.Message}"); }
+                        catch (Exception ex) { LogMessage?.Invoke($"#{channelName}: Failed to send DM report — {ex.Message}", LogLevel.Error); }
                     }
 
                     if (string.IsNullOrWhiteSpace(reportChannelId) && string.IsNullOrWhiteSpace(reportDmUserId))
-                        LogMessage?.Invoke($"#{channelName}: Report generated but no output target configured");
+                        LogMessage?.Invoke($"#{channelName}: Report generated but no output target configured", LogLevel.Warning);
 
                     reportsSent++;
-                    RecordReport(channelName, result);
-                    LogMessage?.Invoke($"#{channelName}: REPORT SENT [{result.Severity?.ToUpper()}] {result.Title ?? result.ReportType}");
+                    RecordReport(channelName, channelId, result, messages);
+                    LogMessage?.Invoke($"#{channelName}: REPORT SENT [{result.Severity?.ToUpper()}] {result.Title ?? result.ReportType}", LogLevel.Info);
                 }
                 else
                 {
-                    LogMessage?.Invoke($"#{channelName}: No issues found");
+                    LogMessage?.Invoke($"#{channelName}: No issues found", LogLevel.Info);
                 }
             }
             catch (Exception ex)
             {
-                LogMessage?.Invoke($"#{channelName}: Error — {ex.Message}");
+                LogMessage?.Invoke($"#{channelName}: Error — {ex.Message}", LogLevel.Error);
             }
 
             _buffer.MarkClean(channelId);
         }
 
         var elapsed = (DateTimeOffset.UtcNow - startTime).TotalSeconds;
-        LogMessage?.Invoke($"Cycle complete in {elapsed:F1}s — {reportsSent} report(s) from {totalMessages} message(s)");
+        LogMessage?.Invoke($"Cycle complete in {elapsed:F1}s — {reportsSent} report(s) from {totalMessages} message(s)", LogLevel.Info);
     }
 
     private string BuildSystemPrompt()
@@ -167,13 +171,42 @@ public class AnalysisService
         return $"{(int)ago.TotalDays}d ago";
     }
 
-    private static string BuildUserPrompt(List<Models.MessageEntry> messages)
+    private string BuildUserPrompt(List<Models.MessageEntry> messages, string channelId)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("Messages from this channel (sliding window):");
-        sb.AppendLine();
+        var ordered = messages.OrderBy(m => m.Timestamp).ToList();
 
-        foreach (var msg in messages.OrderBy(m => m.Timestamp))
+        var hasReport = _channelLastReportTimestamps.TryGetValue(channelId, out var lastReportTs);
+        List<Models.MessageEntry> contextMessages;
+        List<Models.MessageEntry> targetMessages;
+
+        if (hasReport)
+        {
+            contextMessages = ordered.Where(m => m.Timestamp <= lastReportTs).ToList();
+            targetMessages = ordered.Where(m => m.Timestamp > lastReportTs).ToList();
+        }
+        else
+        {
+            contextMessages = [];
+            targetMessages = ordered;
+        }
+
+        var sb = new StringBuilder();
+
+        if (contextMessages.Count > 0)
+        {
+            sb.AppendLine("Previous Context (For reference only - DO NOT report these):");
+            sb.AppendLine();
+            foreach (var msg in contextMessages)
+            {
+                var time = msg.Timestamp.ToLocalTime().ToString("HH:mm");
+                sb.AppendLine($"[#{msg.ChannelName}] {msg.AuthorName} ({time}): {msg.Content}");
+            }
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("TARGET MESSAGES TO EVALUATE (Judge ONLY these messages):");
+        sb.AppendLine();
+        foreach (var msg in targetMessages)
         {
             var time = msg.Timestamp.ToLocalTime().ToString("HH:mm");
             sb.AppendLine($"[#{msg.ChannelName}] {msg.AuthorName} ({time}): {msg.Content}");
@@ -195,11 +228,12 @@ public class AnalysisService
 
     private ReportResult ParseResponse(string response)
     {
+        response = Regex.Replace(response, @"<think>[\s\S]*?<\/think>", "").Trim();
         var json = ExtractJson(response);
 
         if (string.IsNullOrWhiteSpace(json))
         {
-            LogMessage?.Invoke("Parse: no JSON found in response");
+            LogMessage?.Invoke("Parse: no JSON found in response", LogLevel.Warning);
             return new ReportResult { NeedsReport = false };
         }
 
@@ -223,7 +257,7 @@ public class AnalysisService
         }
         catch (Exception ex)
         {
-            LogMessage?.Invoke($"Parse: JSON deserialization failed — {ex.Message}");
+            LogMessage?.Invoke($"Parse: JSON deserialization failed — {ex.Message}", LogLevel.Warning);
             return new ReportResult { NeedsReport = false };
         }
     }
@@ -322,7 +356,7 @@ public class AnalysisService
         return $"https://discord.com/channels/{m.GuildId}/{m.ChannelId}/{m.MessageId}";
     }
 
-    private void RecordReport(string channelName, ReportResult result)
+    private void RecordReport(string channelName, string channelId, ReportResult result, List<Models.MessageEntry> messages)
     {
         _recentReports.Add(new RecentReport(
             channelName,
@@ -333,6 +367,12 @@ public class AnalysisService
 
         while (_recentReports.Count > MaxReportHistory)
             _recentReports.RemoveAt(0);
+
+        if (messages.Count > 0)
+        {
+            var maxTs = messages.Max(m => m.Timestamp);
+            _channelLastReportTimestamps[channelId] = maxTs;
+        }
     }
 }
 

@@ -146,7 +146,7 @@ public class DiscordBotService
 
     private void OnLog(object? sender, LogMessage msg)
     {
-        if (msg.Level >= LogLevel.Warning)
+        if (msg.Level >= SimpleDiscordNet.Logging.LogLevel.Warning)
             ErrorOccurred?.Invoke(new Exception($"[{msg.Level}] {msg.Message}"));
     }
 }

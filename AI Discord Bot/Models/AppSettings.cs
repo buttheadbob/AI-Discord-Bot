@@ -26,6 +26,8 @@ public class AppSettings
 
     public int ContextSize { get; set; } = 4096;
 
+    public float Temperature { get; set; } = 0.6f;
+
     public List<string> EnabledReportTypes { get; set; } =
     [
         "ToxicChat",

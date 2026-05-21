@@ -1,13 +1,34 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using LLama;
 using LLama.Common;
+using LLama.Native;
 using LLama.Sampling;
 
 namespace AI_Discord_Bot.Services;
 
-public class LlamaService : IDisposable
+public partial class LlamaService : IDisposable
 {
+    private static NativeLogConfig.LLamaLogCallback? _nativeLogCallback;
+    private static Action<string>? _onNativeLog;
+
+    public static void EnableNativeLogging(Action<string> onLog)
+    {
+        _onNativeLog = onLog;
+        _nativeLogCallback = (level, message) =>
+        {
+            var stripped = AnsiEscapeRegex().Replace(message, "");
+            var trimmed = stripped.TrimEnd('\n', '\r');
+            if (!string.IsNullOrWhiteSpace(trimmed))
+                _onNativeLog?.Invoke(trimmed);
+        };
+        NativeLogConfig.llama_log_set(_nativeLogCallback);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\x1b\[[0-9;]*[a-zA-Z]")]
+    private static partial Regex AnsiEscapeRegex();
+
     private LLamaWeights? _model;
     private ModelParams? _modelParams;
     private bool _disposed;
@@ -16,6 +37,7 @@ public class LlamaService : IDisposable
     public string ModelPath { get; private set; } = "";
     public string ActiveBackend { get; private set; } = "None";
     public int LoadedContextSize { get; private set; }
+    public float Temperature { get; set; } = 0.6f;
 
     private const int MinContext = 2048;
     private const int MaxContext = 262144;
@@ -121,8 +143,8 @@ public class LlamaService : IDisposable
             var inferenceParams = new InferenceParams
             {
                 MaxTokens = 1024,
-                AntiPrompts = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"],
-                SamplingPipeline = new DefaultSamplingPipeline()
+                AntiPrompts = ["<|im_end|>", "<|im_start|>", "<|endoftext|>", "}"],
+                SamplingPipeline = new DefaultSamplingPipeline { Temperature = Temperature }
             };
 
             var sb = new StringBuilder();

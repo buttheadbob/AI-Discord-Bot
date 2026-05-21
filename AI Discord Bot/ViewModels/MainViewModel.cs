@@ -24,6 +24,7 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly DispatcherTimer _statusTimer;
     private DateTimeOffset _nextCycleAt;
     private bool _isProcessing;
+    private ConsoleTextWriter? _consoleWriter;
 
     public MainViewModel()
     {
@@ -50,15 +51,15 @@ public class MainViewModel : INotifyPropertyChanged
             });
         };
 
-        _llama = new LlamaService();
+        _llama = new LlamaService { Temperature = _appSettings.Temperature };
         _downloader = new ModelDownloadService();
 
         _analysis = new AnalysisService(_buffer, _llama, _discord, _appSettings.EnabledReportTypes, _appSettings.CustomRules);
-        _analysis.LogMessage += msg =>
+        _analysis.LogMessage += (msg, level) =>
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                AddLogEntry(msg);
+                AddLogEntry(msg, level);
                 UpdateBufferStats();
             });
         };
@@ -68,6 +69,12 @@ public class MainViewModel : INotifyPropertyChanged
         _statusTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal,
             (_, _) => OnPropertyChanged(nameof(StatusText)), Application.Current.Dispatcher);
         _statusTimer.Stop();
+
+        _consoleWriter = new ConsoleTextWriter(line => Application.Current.Dispatcher.Invoke(() => AppendConsole(line)));
+        Console.SetOut(_consoleWriter);
+        Console.SetError(_consoleWriter);
+
+        LlamaService.EnableNativeLogging(line => Application.Current.Dispatcher.Invoke(() => AppendConsole(line)));
     }
 
     public async Task InitializeAsync()
@@ -77,7 +84,7 @@ public class MainViewModel : INotifyPropertyChanged
             await ConnectDiscordAsync();
             if (_discord.IsConnected)
             {
-                Log("Waiting for guild data...");
+                LogDebug("Waiting for guild data...");
                 for (var i = 0; i < 20; i++)
                 {
                     await Task.Delay(500);
@@ -219,6 +226,21 @@ public class MainViewModel : INotifyPropertyChanged
         get => _appSettings.FlashAttention;
         set { _appSettings.FlashAttention = value; OnPropertyChanged(); ScheduleSave(); }
     }
+
+    public float Temperature
+    {
+        get => _appSettings.Temperature;
+        set
+        {
+            _appSettings.Temperature = value;
+            _llama.Temperature = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(TemperatureText));
+            ScheduleSave();
+        }
+    }
+
+    public string TemperatureText => Temperature.ToString("F1");
 
     public bool AutoContextSize
     {
@@ -422,7 +444,20 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public ObservableCollection<string> LogEntries { get; } = [];
+    public ObservableCollection<LogEntry> LogEntries { get; } = [];
+
+    private string _consoleOutput = "";
+    public string ConsoleOutput
+    {
+        get => _consoleOutput;
+        set { _consoleOutput = value; OnPropertyChanged(); }
+    }
+
+    public void AppendConsole(string line)
+    {
+        _consoleOutput += line + Environment.NewLine;
+        OnPropertyChanged(nameof(ConsoleOutput));
+    }
 
     // --- Commands ---
 
@@ -467,15 +502,15 @@ public class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            Log("Connecting to Discord...");
+            LogInfo("Connecting to Discord...");
             await _discord.ConnectAsync(BotToken);
-            Log($"Bot connected");
+            LogInfo("Bot connected");
             OnPropertyChanged(nameof(CanStart));
 RefreshCommands();
         }
         catch (Exception ex)
         {
-            Log($"Discord connection failed: {ex.Message}");
+            LogError($"Discord connection failed: {ex.Message}");
         }
     }
 
@@ -484,7 +519,7 @@ RefreshCommands();
         if (IsMonitoring) StopMonitoring();
         await _discord.DisconnectAsync();
         Channels.Clear();
-        Log("Bot disconnected");
+        LogInfo("Bot disconnected");
         OnPropertyChanged(nameof(CanStart));
 RefreshCommands();
     }
@@ -513,16 +548,16 @@ RefreshCommands();
             }
 
             if (Channels.Count == 0)
-                Log("No text channels found. Ensure the bot has the required permissions.");
+                LogWarning("No text channels found. Ensure the bot has the required permissions.");
             else
-                Log($"Found {Channels.Count} text channel(s) across {guilds.Count} guild(s)");
+                LogInfo($"Found {Channels.Count} text channel(s) across {guilds.Count} guild(s)");
 
             RestoreReportChannelSelection();
             await RefreshMembersAsync();
         }
         catch (Exception ex)
         {
-            Log($"Failed to refresh channels: {ex.Message}");
+            LogError($"Failed to refresh channels: {ex.Message}");
         }
     }
 
@@ -556,7 +591,7 @@ RefreshCommands();
         }
         catch (Exception ex)
         {
-            Log($"Failed to refresh members: {ex.Message}");
+            LogError($"Failed to refresh members: {ex.Message}");
         }
     }
 
@@ -586,10 +621,10 @@ RefreshCommands();
     {
         try
         {
-            Log($"Loading model: {ModelPath}");
-            var progress = new Progress<string>(msg => Log(msg));
+            LogInfo($"Loading model: {ModelPath}");
+            var progress = new Progress<string>(msg => LogInfo(msg));
             await _llama.LoadModelAsync(ModelPath, GpuLayerCount, ContextSize, FlashAttention, progress);
-            Log($"Model loaded. Backend: {_llama.ActiveBackend}");
+            LogInfo($"Model loaded. Backend: {_llama.ActiveBackend}");
             OnPropertyChanged(nameof(IsModelLoaded));
             OnPropertyChanged(nameof(ActiveBackend));
             OnPropertyChanged(nameof(CanLoadModel));
@@ -599,14 +634,14 @@ RefreshCommands();
         }
         catch (Exception ex)
         {
-            Log($"Failed to load model: {ex.Message}");
+            LogError($"Failed to load model: {ex.Message}");
         }
     }
 
     private void UnloadModel()
     {
         _llama.UnloadModel();
-        Log("Model unloaded");
+        LogInfo("Model unloaded");
         OnPropertyChanged(nameof(IsModelLoaded));
         OnPropertyChanged(nameof(ActiveBackend));
         OnPropertyChanged(nameof(CanLoadModel));
@@ -625,13 +660,13 @@ RefreshCommands();
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                Log("No download URL specified.");
+                LogWarning("No download URL specified.");
                 return;
             }
 
             var exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
             var modelsFolder = Path.Combine(exeDir, "Models");
-            Log($"Downloading model from {url}...");
+            LogInfo($"Downloading model from {url}...");
 
             OnPropertyChanged(nameof(IsDownloading));
             OnPropertyChanged(nameof(CanDownload));
@@ -641,7 +676,7 @@ RefreshCommands();
             var savePath = await _downloader.DownloadAsync(url, modelsFolder, progress);
 
             ModelPath = savePath;
-            Log($"Download complete: {Path.GetFileName(savePath)}");
+            LogInfo($"Download complete: {Path.GetFileName(savePath)}");
 
             OnPropertyChanged(nameof(IsDownloading));
             OnPropertyChanged(nameof(CanDownload));
@@ -649,13 +684,13 @@ RefreshCommands();
         }
         catch (OperationCanceledException)
         {
-            Log("Download cancelled");
+            LogInfo("Download cancelled");
             DownloadProgress = 0;
             OnPropertyChanged(nameof(IsDownloading));
         }
         catch (Exception ex)
         {
-            Log($"Download failed: {ex.Message}");
+            LogError($"Download failed: {ex.Message}");
             DownloadProgress = 0;
             OnPropertyChanged(nameof(IsDownloading));
         }
@@ -677,7 +712,7 @@ RefreshCommands();
         _nextCycleAt = DateTimeOffset.Now + TimeSpan.FromSeconds(IntervalSeconds);
         _timer.Start();
         _statusTimer.Start();
-        Log($"Monitoring started: {ids.Count} channel(s), every {IntervalSeconds}s");
+        LogInfo($"Monitoring started: {ids.Count} channel(s), every {IntervalSeconds}s");
         OnPropertyChanged(nameof(IsMonitoring));
         OnPropertyChanged(nameof(CanStart));
         RefreshCommands();
@@ -691,7 +726,7 @@ RefreshCommands();
         _timer.Stop();
         _statusTimer.Stop();
         _isProcessing = false;
-        Log("Monitoring stopped");
+        LogInfo("Monitoring stopped");
         OnPropertyChanged(nameof(IsMonitoring));
         OnPropertyChanged(nameof(CanStart));
         RefreshCommands();
@@ -710,7 +745,7 @@ RefreshCommands();
         }
         catch (Exception ex)
         {
-            Log($"Analysis error: {ex.Message}");
+            LogError($"Analysis error: {ex.Message}");
         }
 
         _isProcessing = false;
@@ -732,15 +767,24 @@ RefreshCommands();
         BufferStats = $"{_buffer.TotalMessageCount} msgs / {_buffer.ActiveChannelCount} channels";
     }
 
-    private void Log(string message)
+    private void LogInfo(string message) => Log(LogLevel.Info, message);
+    private void LogWarning(string message) => Log(LogLevel.Warning, message);
+    private void LogError(string message) => Log(LogLevel.Error, message);
+    private void LogDebug(string message) => Log(LogLevel.Debug, message);
+
+    private void Log(LogLevel level, string message)
     {
-        Application.Current.Dispatcher.Invoke(() => AddLogEntry(message));
+        Application.Current.Dispatcher.Invoke(() => AddLogEntry(message, level));
     }
 
-    private void AddLogEntry(string message)
+    private void AddLogEntry(string message, LogLevel level)
     {
-        var timestamp = DateTimeOffset.Now.ToString("HH:mm:ss");
-        LogEntries.Add($"[{timestamp}] {message}");
+        LogEntries.Add(new LogEntry
+        {
+            Timestamp = DateTimeOffset.Now,
+            Level = level,
+            Message = message
+        });
         while (LogEntries.Count > 100)
             LogEntries.RemoveAt(0);
     }

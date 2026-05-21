@@ -7,272 +7,319 @@
         Height="640" Width="960" MinHeight="500" MinWidth="800">
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="380" MinWidth="280"/>
-            <ColumnDefinition Width="4"/>
-            <ColumnDefinition Width="*" MinWidth="300"/>
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-        <!-- Left Panel: Configuration -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="8">
-            <StackPanel>
+        <TabControl Grid.Row="0" Margin="4,4,4,0">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Padding" Value="12,6"/>
+                    <Setter Property="FontSize" Value="13"/>
+                </Style>
+            </TabControl.Resources>
 
-                <!-- Discord Connection -->
-                <GroupBox Header="Discord Connection" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Label Content="Bot Token:" Padding="0,0,0,2"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <PasswordBox x:Name="TokenBox" PasswordChar="•" VerticalContentAlignment="Center"
-                                         PasswordChanged="TokenBox_PasswordChanged"/>
-                            <Button Grid.Column="1" Content="Connect" Width="72" Margin="4,0,0,0"
-                                    Command="{Binding ConnectDiscordCommand}" Padding="6,4"/>
-                        </Grid>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Button Content="Disconnect" Width="72" Padding="6,4"
-                                    Command="{Binding DisconnectDiscordCommand}"/>
-                            <TextBlock Text="{Binding BotStatus}" VerticalAlignment="Center" Margin="8,0,0,0"
-                                       FontWeight="SemiBold"/>
-                        </StackPanel>
+            <!-- Log Tab -->
+            <TabItem Header="Log">
+                <Grid Margin="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <CheckBox Content="Auto-scroll" IsChecked="{Binding AutoScrollLog}"
+                                  VerticalAlignment="Center"/>
                     </StackPanel>
-                </GroupBox>
-
-                <!-- Channels to Monitor -->
-                <GroupBox Header="Channels to Monitor" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Button Content="Refresh" HorizontalAlignment="Right" Padding="8,4"
-                                Command="{Binding RefreshChannelsCommand}" Margin="0,0,0,4"/>
-                        <ListBox ItemsSource="{Binding Channels}" MaxHeight="160"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <CheckBox Content="{Binding DisplayText}" IsChecked="{Binding IsSelected}"
-                                              VerticalContentAlignment="Center" Margin="2,1"/>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- Report Channel -->
-                <GroupBox Header="Report Channel" Margin="0,0,0,8">
-                    <ComboBox ItemsSource="{Binding Channels}"
-                              SelectedItem="{Binding SelectedReportChannel}"
-                              DisplayMemberPath="DisplayText"
-                              VerticalContentAlignment="Center" Padding="4,4"/>
-                </GroupBox>
-
-                <!-- DM Report User -->
-                <GroupBox Header="DM Reports To" Margin="0,0,0,8">
-                    <ComboBox ItemsSource="{Binding Members}"
-                              Text="{Binding ReportDmUserText, UpdateSourceTrigger=PropertyChanged}"
-                              SelectedItem="{Binding SelectedReportDmUser}"
-                              DisplayMemberPath="DisplayText"
-                              IsEditable="True"
-                              IsTextSearchEnabled="True"
-                              VerticalContentAlignment="Center" Padding="4,4"/>
-                </GroupBox>
-
-                <!-- LLM -->
-                <GroupBox Header="LLM (LlamaSharp)" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Label Content="Model File:" Padding="0,0,0,2"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding ModelPath, UpdateSourceTrigger=PropertyChanged}"
-                                     VerticalContentAlignment="Center" IsReadOnly="True"
-                                     TextWrapping="NoWrap" Padding="4,4"/>
-                            <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
-                                    Command="{Binding BrowseModelCommand}" Padding="6,4"/>
-                        </Grid>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <TextBlock Text="Backend:" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                            <TextBlock Text="{Binding ActiveBackend}" VerticalAlignment="Center"
-                                       FontWeight="SemiBold"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Label Content="Mode:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                            <ComboBox ItemsSource="{Binding BackendModeOptions}"
-                                      SelectedItem="{Binding BackendMode}"
-                                      Width="110" VerticalContentAlignment="Center" Padding="4,4"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                            <Slider Minimum="0" Maximum="99" Value="{Binding GpuLayerCount}"
-                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
-                                    VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding GpuLayerCount}" VerticalAlignment="Center"
-                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
-                        </StackPanel>
-
-                        <CheckBox Content="Flash Attention" IsChecked="{Binding FlashAttention}"
-                                  Margin="0,6,0,0"/>
-
-                        <CheckBox Content="Auto Context Size" IsChecked="{Binding AutoContextSize}"
-                                  Margin="0,6,0,0"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
-                                    IsEnabled="{Binding IsManualContext}">
-                            <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                            <ComboBox ItemsSource="{Binding ContextSizeOptions}"
-                                      Text="{Binding ContextSizeText, UpdateSourceTrigger=PropertyChanged}"
-                                      IsEditable="True" Width="80"
-                                      VerticalContentAlignment="Center" Padding="4,4"/>
-                            <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Content="Load Model" Width="80" Padding="6,4"
-                                    Command="{Binding LoadModelCommand}"/>
-                            <Button Content="Unload" Width="60" Margin="4,0,0,0" Padding="6,4"
-                                    Command="{Binding UnloadModelCommand}"/>
-                        </StackPanel>
-
-                        <Separator Margin="0,8,0,6"/>
-
-                        <Label Content="Download Model:" Padding="0,0,0,2" FontWeight="SemiBold"/>
-                        <ComboBox ItemsSource="{Binding CuratedModelNames}"
-                                  SelectedItem="{Binding SelectedCuratedModel}"
-                                  VerticalContentAlignment="Center" Padding="4,4"/>
-                        <Label Content="Or enter URL:" Padding="0,4,0,2"/>
-                        <TextBox Text="{Binding CustomDownloadUrl, UpdateSourceTrigger=PropertyChanged}"
-                                 VerticalContentAlignment="Center" Padding="4,4"/>
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100"
-                                         Height="20" VerticalAlignment="Center"/>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0">
-                                <Button Content="Download" Width="72" Padding="6,4"
-                                        Command="{Binding DownloadModelCommand}"/>
-                                <Button Content="Cancel" Width="56" Margin="4,0,0,0" Padding="6,4"
-                                        Command="{Binding CancelDownloadCommand}"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- Report Options -->
-                <GroupBox Header="Report Types" Margin="0,0,0,8">
-                    <StackPanel>
-                        <CheckBox Content="Toxic Chat / Behavior" IsChecked="{Binding ReportToxicChat}"
-                                  Margin="0,1"/>
-                        <CheckBox Content="Complaints" IsChecked="{Binding ReportComplaints}" Margin="0,1"/>
-                        <CheckBox Content="Server Issues" IsChecked="{Binding ReportServerIssues}" Margin="0,1"/>
-                        <CheckBox Content="Server Down" IsChecked="{Binding ReportServerDown}" Margin="0,1"/>
-                        <CheckBox Content="SimSpeed Issues" IsChecked="{Binding ReportSimSpeedIssues}" Margin="0,1"/>
-                        <CheckBox Content="Player Complaints" IsChecked="{Binding ReportPlayerComplaints}" Margin="0,1"/>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- Custom Rules -->
-                <GroupBox Header="Analysis Rules" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="Tell the bot how to evaluate messages:"
-                                   TextWrapping="Wrap" Margin="0,0,0,4"/>
-                        <TextBox Text="{Binding CustomRules, UpdateSourceTrigger=PropertyChanged}"
-                                 TextWrapping="Wrap" AcceptsReturn="True"
-                                 MinLines="4" MaxLines="8"
+                    <RichTextBox x:Name="LogRichTextBox" Grid.Row="1"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas" FontSize="12"
                                  VerticalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas" FontSize="11"
-                                 Padding="4,4"/>
-                        <Button Content="Reset to Default" HorizontalAlignment="Right"
-                                Margin="0,4,0,0" Padding="6,4"
-                                Command="{Binding ResetRulesCommand}"/>
-                    </StackPanel>
-                </GroupBox>
+                                 HorizontalScrollBarVisibility="Auto"
+                                 BorderThickness="0"
+                                 Padding="4">
+                        <RichTextBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copy" Command="Copy"/>
+                            </ContextMenu>
+                        </RichTextBox.ContextMenu>
+                    </RichTextBox>
+                </Grid>
+            </TabItem>
 
-                <!-- Monitoring Controls -->
-                <GroupBox Header="Monitoring" Margin="0,0,0,8">
+            <!-- Console Tab -->
+            <TabItem Header="Console">
+                <Grid Margin="4">
+                    <TextBox x:Name="ConsoleTextBox"
+                             Text="{Binding ConsoleOutput, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontFamily="Consolas" FontSize="12"
+                             VerticalScrollBarVisibility="Visible"
+                             HorizontalScrollBarVisibility="Auto"
+                             BorderThickness="0"
+                             AcceptsReturn="True"
+                             Padding="4"/>
+                </Grid>
+            </TabItem>
+
+            <!-- Discord Tab -->
+            <TabItem Header="Discord">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Label Content="Interval:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding IntervalSeconds, UpdateSourceTrigger=PropertyChanged}"
-                                     Width="50" VerticalContentAlignment="Center" TextAlignment="Center"
-                                     Padding="4,4"/>
-                            <Label Content="seconds" Padding="4,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Label Content="Window:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding WindowSize, UpdateSourceTrigger=PropertyChanged}"
-                                     Width="50" VerticalContentAlignment="Center" TextAlignment="Center"
-                                     Padding="4,4"/>
-                            <Label Content="messages per channel" Padding="4,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <TextBlock Text="{Binding BufferStats}" Margin="0,4,0,0" FontWeight="SemiBold"/>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Content="▶ Start" Width="72" Padding="6,4"
-                                    Command="{Binding StartMonitoringCommand}"/>
-                            <Button Content="■ Stop" Width="56" Margin="4,0,0,0" Padding="6,4"
-                                    Command="{Binding StopMonitoringCommand}"/>
-                        </StackPanel>
+                        <GroupBox Header="Discord Connection" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Label Content="Bot Token:" Padding="0,0,0,2"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <PasswordBox x:Name="TokenBox" PasswordChar="•" VerticalContentAlignment="Center"
+                                                 PasswordChanged="TokenBox_PasswordChanged"/>
+                                    <Button Grid.Column="1" Content="Connect" Width="72" Margin="4,0,0,0"
+                                            Command="{Binding ConnectDiscordCommand}" Padding="6,4"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Button Content="Disconnect" Width="72" Padding="6,4"
+                                            Command="{Binding DisconnectDiscordCommand}"/>
+                                    <TextBlock Text="{Binding BotStatus}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                               FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
                     </StackPanel>
-                </GroupBox>
+                </ScrollViewer>
+            </TabItem>
 
-            </StackPanel>
-        </ScrollViewer>
+            <!-- Model Tab -->
+            <TabItem Header="Model">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <GroupBox Header="LLM (LlamaSharp)" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Label Content="Model File:" Padding="0,0,0,2"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding ModelPath, UpdateSourceTrigger=PropertyChanged}"
+                                             VerticalContentAlignment="Center" IsReadOnly="True"
+                                             TextWrapping="NoWrap" Padding="4,4"/>
+                                    <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
+                                            Command="{Binding BrowseModelCommand}" Padding="6,4"/>
+                                </Grid>
 
-        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch" Background="Transparent"
-                      ShowsPreview="True" ResizeBehavior="PreviousAndNext"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <TextBlock Text="Backend:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding ActiveBackend}" VerticalAlignment="Center"
+                                               FontWeight="SemiBold"/>
+                                </StackPanel>
 
-        <!-- Right Panel: Activity Log -->
-        <GroupBox Grid.Column="2" Margin="4,8,8,8">
-            <GroupBox.Header>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Activity Log" VerticalAlignment="Center"/>
-                    <CheckBox Content="Auto-scroll" IsChecked="{Binding AutoScrollLog}"
-                              Margin="12,0,0,0" VerticalAlignment="Center"/>
-                </StackPanel>
-            </GroupBox.Header>
-            <ListBox x:Name="LogListBox" ItemsSource="{Binding LogEntries}"
-                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                     VirtualizingPanel.ScrollUnit="Pixel"
-                     FontFamily="Consolas" FontSize="12"
-                     Padding="4"
-                     MouseRightButtonUp="LogList_MouseRightButtonUp">
-                <ListBox.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Copy" Click="LogContext_Copy"/>
-                    </ContextMenu>
-                </ListBox.ContextMenu>
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="NoWrap" Margin="0,1"/>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </GroupBox>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Label Content="Mode:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                    <ComboBox ItemsSource="{Binding BackendModeOptions}"
+                                              SelectedItem="{Binding BackendMode}"
+                                              Width="110" VerticalContentAlignment="Center" Padding="4,4"/>
+                                </StackPanel>
+
+                                <Expander Header="Advanced" IsExpanded="False" Margin="0,6,0,0">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0" Maximum="99" Value="{Binding GpuLayerCount}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding GpuLayerCount}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
+
+                                        <CheckBox Content="Flash Attention" IsChecked="{Binding FlashAttention}"
+                                                  Margin="0,2,0,0"/>
+
+                                        <CheckBox Content="Auto Context Size" IsChecked="{Binding AutoContextSize}"
+                                                  Margin="0,6,0,0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                                    IsEnabled="{Binding IsManualContext}">
+                                            <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <ComboBox ItemsSource="{Binding ContextSizeOptions}"
+                                                      Text="{Binding ContextSizeText, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEditable="True" Width="80"
+                                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                                            <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Label Content="Temperature:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0.1" Maximum="2.0" Value="{Binding Temperature}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="0.1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding TemperatureText}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button Content="Load Model" Width="80" Padding="6,4"
+                                            Command="{Binding LoadModelCommand}"/>
+                                    <Button Content="Unload" Width="60" Margin="4,0,0,0" Padding="6,4"
+                                            Command="{Binding UnloadModelCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Download Model" Margin="0,0,0,8">
+                            <StackPanel>
+                                <ComboBox ItemsSource="{Binding CuratedModelNames}"
+                                          SelectedItem="{Binding SelectedCuratedModel}"
+                                          VerticalContentAlignment="Center" Padding="4,4"/>
+                                <Label Content="Or enter URL:" Padding="0,4,0,2"/>
+                                <TextBox Text="{Binding CustomDownloadUrl, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center" Padding="4,4"/>
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100"
+                                                 Height="20" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0">
+                                        <Button Content="Download" Width="72" Padding="6,4"
+                                                Command="{Binding DownloadModelCommand}"/>
+                                        <Button Content="Cancel" Width="56" Margin="4,0,0,0" Padding="6,4"
+                                                Command="{Binding CancelDownloadCommand}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Rules Tab -->
+            <TabItem Header="Rules">
+                <Grid Margin="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBox Text="{Binding CustomRules, UpdateSourceTrigger=PropertyChanged}"
+                             Grid.Row="0"
+                             TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas" FontSize="12"
+                             Padding="4"/>
+                    <Button Content="Reset to Default" HorizontalAlignment="Right"
+                            Grid.Row="1" Margin="0,4,0,0" Padding="6,4"
+                            Command="{Binding ResetRulesCommand}"/>
+                </Grid>
+            </TabItem>
+
+            <!-- Monitoring Tab -->
+            <TabItem Header="Monitoring">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <GroupBox Header="Channels to Monitor" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Button Content="Refresh" HorizontalAlignment="Right" Padding="8,4"
+                                        Command="{Binding RefreshChannelsCommand}" Margin="0,0,0,4"/>
+                                <ListBox ItemsSource="{Binding Channels}" MaxHeight="160"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding DisplayText}" IsChecked="{Binding IsSelected}"
+                                                      VerticalContentAlignment="Center" Margin="2,1"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Report Channel" Margin="0,0,0,8">
+                            <ComboBox ItemsSource="{Binding Channels}"
+                                      SelectedItem="{Binding SelectedReportChannel}"
+                                      DisplayMemberPath="DisplayText"
+                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                        </GroupBox>
+
+                        <GroupBox Header="DM Reports To" Margin="0,0,0,8">
+                            <ComboBox ItemsSource="{Binding Members}"
+                                      Text="{Binding ReportDmUserText, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedItem="{Binding SelectedReportDmUser}"
+                                      DisplayMemberPath="DisplayText"
+                                      IsEditable="True"
+                                      IsTextSearchEnabled="True"
+                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                        </GroupBox>
+
+                        <GroupBox Header="Report Types" Margin="0,0,0,8">
+                            <StackPanel>
+                                <CheckBox Content="Toxic Chat / Behavior" IsChecked="{Binding ReportToxicChat}"
+                                          Margin="0,1"/>
+                                <CheckBox Content="Complaints" IsChecked="{Binding ReportComplaints}" Margin="0,1"/>
+                                <CheckBox Content="Server Issues" IsChecked="{Binding ReportServerIssues}" Margin="0,1"/>
+                                <CheckBox Content="Server Down" IsChecked="{Binding ReportServerDown}" Margin="0,1"/>
+                                <CheckBox Content="SimSpeed Issues" IsChecked="{Binding ReportSimSpeedIssues}" Margin="0,1"/>
+                                <CheckBox Content="Player Complaints" IsChecked="{Binding ReportPlayerComplaints}" Margin="0,1"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Monitoring Controls" Margin="0,0,0,8">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Label Content="Interval:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding IntervalSeconds, UpdateSourceTrigger=PropertyChanged}"
+                                             Width="50" VerticalContentAlignment="Center" TextAlignment="Center"
+                                             Padding="4,4"/>
+                                    <Label Content="seconds" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Label Content="Window:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding WindowSize, UpdateSourceTrigger=PropertyChanged}"
+                                             Width="50" VerticalContentAlignment="Center" TextAlignment="Center"
+                                             Padding="4,4"/>
+                                    <Label Content="messages per channel" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding BufferStats}" Margin="0,4,0,0" FontWeight="SemiBold"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button Content="▶ Start" Width="72" Padding="6,4"
+                                            Command="{Binding StartMonitoringCommand}"/>
+                                    <Button Content="■ Stop" Width="56" Margin="4,0,0,0" Padding="6,4"
+                                            Command="{Binding StopMonitoringCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
 
         <!-- Status Bar -->
-        <StatusBar Grid.ColumnSpan="3" VerticalAlignment="Bottom" Padding="8,2">
+        <StatusBar Grid.Row="1" Padding="8,2">
             <StatusBar.ItemsPanel>
                 <ItemsPanelTemplate>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                     </Grid>
                 </ItemsPanelTemplate>
             </StatusBar.ItemsPanel>
-            <StatusBarItem Grid.Column="0">
+            <StatusBarItem Grid.Column="0" Margin="0,0,12,0">
+                <TextBlock Text="{Binding BotStatus}"/>
+            </StatusBarItem>
+            <Separator Grid.Column="1" Margin="0,2,12,2" Style="{StaticResource {x:Static StatusBar.SeparatorStyleKey}}"/>
+            <StatusBarItem Grid.Column="2" Margin="0,0,12,0">
                 <TextBlock Text="{Binding StatusText}"/>
             </StatusBarItem>
-            <StatusBarItem Grid.Column="1">
+            <StatusBarItem Grid.Column="3" HorizontalAlignment="Right">
                 <TextBlock Text="{Binding BufferStats}"/>
             </StatusBarItem>
         </StatusBar>
