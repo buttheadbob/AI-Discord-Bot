@@ -266,14 +266,14 @@
                         </ScrollViewer>
                     </TabItem>
 
-                    <!-- Embedding Model Sub-Tab -->
-                    <TabItem Header="Embedding Model">
+                    <!-- Models Sub-Tab -->
+                    <TabItem Header="Models">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                             <StackPanel>
-                                <TextBlock Text="This tiny model converts text into searchable vectors. Use a small model like all-MiniLM-L6-v2 (Q4_K_M, ~23MB). Larger embedding models offer marginal accuracy gains and are not recommended."
+                                <TextBlock Text="Configure the Chat and Embedding models used by RAG. Each model can be different sizes and have independent settings."
                                            TextWrapping="Wrap" Margin="0,0,0,8" FontSize="11" Foreground="Gray"/>
 
-                                <GroupBox Header="Embedding Model" Margin="0,0,0,8">
+                                <GroupBox Header="RAG Chat Model" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Label Content="Model File:" Padding="0,0,0,2"/>
                                         <Grid>
@@ -281,30 +281,17 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Text="{Binding RagEmbeddingModelPath, UpdateSourceTrigger=PropertyChanged}"
+                                            <TextBox Text="{Binding RagChatModelPath, UpdateSourceTrigger=PropertyChanged}"
                                                      VerticalContentAlignment="Center" IsReadOnly="True"
                                                      TextWrapping="NoWrap" Padding="4,4"/>
                                             <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
-                                                    Command="{Binding BrowseRagEmbeddingModelCommand}" Padding="6,4"/>
+                                                    Command="{Binding BrowseRagChatModelCommand}" Padding="6,4"/>
                                         </Grid>
 
                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                                            <Slider Minimum="0" Maximum="99" Value="{Binding RagEmbeddingGpuLayerCount}"
-                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
-                                                    VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding RagEmbeddingGpuLayerCount}" VerticalAlignment="Center"
-                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </GroupBox>
-
-                                <GroupBox Header="Chat Model" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
                                             <ComboBox ItemsSource="{Binding ContextSizeOptions}"
-                                                      Text="{Binding RagContextSizeText, UpdateSourceTrigger=PropertyChanged}"
+                                                      Text="{Binding RagChatContextSizeText, UpdateSourceTrigger=PropertyChanged}"
                                                       IsEditable="True" Width="80"
                                                       VerticalContentAlignment="Center" Padding="4,4"/>
                                             <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
@@ -339,6 +326,44 @@
 
                                         <CheckBox Content="Flash Attention" IsChecked="{Binding RagFlashAttention}"
                                                   Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <GroupBox Header="RAG Embedding Model" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="Small model (~23MB) that converts text to searchable vectors. all-MiniLM-L6-v2 recommended."
+                                                   TextWrapping="Wrap" Margin="0,0,0,6" FontSize="11" Foreground="Gray"/>
+
+                                        <Label Content="Model File:" Padding="0,0,0,2"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{Binding RagEmbeddingModelPath, UpdateSourceTrigger=PropertyChanged}"
+                                                     VerticalContentAlignment="Center" IsReadOnly="True"
+                                                     TextWrapping="NoWrap" Padding="4,4"/>
+                                            <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
+                                                    Command="{Binding BrowseRagEmbeddingModelCommand}" Padding="6,4"/>
+                                        </Grid>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0" Maximum="99" Value="{Binding RagEmbeddingGpuLayerCount}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding RagEmbeddingGpuLayerCount}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <ComboBox ItemsSource="{Binding ContextSizeOptions}"
+                                                      Text="{Binding RagEmbedContextSizeText, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEditable="True" Width="80"
+                                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                                            <Label Content="tokens (0 = auto)" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </GroupBox>
 

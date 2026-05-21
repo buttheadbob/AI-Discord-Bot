@@ -44,9 +44,13 @@ public class AppSettings
 
     public string RagEmbeddingModelPath { get; set; } = "";
 
+    public string RagChatModelPath { get; set; } = "";
+
     public List<string> RagDocumentPaths { get; set; } = [];
 
-    public int RagContextSize { get; set; } = 4096;
+    public int RagChatContextSize { get; set; } = 4096;
+
+    public int RagEmbedContextSize { get; set; } = 0;
 
     public int RagMaxTokens { get; set; } = 4096;
 

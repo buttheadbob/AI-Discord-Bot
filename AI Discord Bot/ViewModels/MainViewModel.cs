@@ -408,22 +408,40 @@ public class MainViewModel : INotifyPropertyChanged
         set { _appSettings.RagEmbeddingModelPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInitializeRag)); ScheduleSave(); }
     }
 
+    public string RagChatModelPath
+    {
+        get => _appSettings.RagChatModelPath;
+        set { _appSettings.RagChatModelPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInitializeRag)); ScheduleSave(); }
+    }
+
     public bool RagIsInitialized => RagService.Instance.IsInitialized;
 
     public string RagStatusText => RagService.Instance.IsInitialized ? "● Initialized" : "○ Not initialized";
 
-    public bool CanInitializeRag => !RagService.Instance.IsInitialized && _llama.IsLoaded && !string.IsNullOrWhiteSpace(RagEmbeddingModelPath) && File.Exists(RagEmbeddingModelPath);
+    public bool CanInitializeRag => !RagService.Instance.IsInitialized && !string.IsNullOrWhiteSpace(RagEmbeddingModelPath) && File.Exists(RagEmbeddingModelPath) && !string.IsNullOrWhiteSpace(RagChatModelPath) && File.Exists(RagChatModelPath);
 
-    public int RagContextSize
+    public int RagChatContextSize
     {
-        get => _appSettings.RagContextSize;
-        set { _appSettings.RagContextSize = Math.Clamp(value, 1024, 262144); OnPropertyChanged(); OnPropertyChanged(nameof(RagContextSizeText)); ScheduleSave(); }
+        get => _appSettings.RagChatContextSize;
+        set { _appSettings.RagChatContextSize = Math.Clamp(value, 1024, 262144); OnPropertyChanged(); OnPropertyChanged(nameof(RagChatContextSizeText)); ScheduleSave(); }
     }
 
-    public string RagContextSizeText
+    public string RagChatContextSizeText
     {
-        get => RagContextSize.ToString();
-        set { if (int.TryParse(value, out var parsed)) RagContextSize = parsed; }
+        get => RagChatContextSize.ToString();
+        set { if (int.TryParse(value, out var parsed)) RagChatContextSize = parsed; }
+    }
+
+    public int RagEmbedContextSize
+    {
+        get => _appSettings.RagEmbedContextSize;
+        set { _appSettings.RagEmbedContextSize = Math.Clamp(value, 0, 262144); OnPropertyChanged(); OnPropertyChanged(nameof(RagEmbedContextSizeText)); ScheduleSave(); }
+    }
+
+    public string RagEmbedContextSizeText
+    {
+        get => RagEmbedContextSize.ToString();
+        set { if (int.TryParse(value, out var parsed)) RagEmbedContextSize = parsed; }
     }
 
     public int RagMaxTokens
@@ -622,6 +640,9 @@ public class MainViewModel : INotifyPropertyChanged
 
     private RelayCommand? _browseRagEmbeddingModelCommand;
     public RelayCommand BrowseRagEmbeddingModelCommand => _browseRagEmbeddingModelCommand ??= new RelayCommand(_ => BrowseRagEmbeddingModel());
+
+    private RelayCommand? _browseRagChatModelCommand;
+    public RelayCommand BrowseRagChatModelCommand => _browseRagChatModelCommand ??= new RelayCommand(_ => BrowseRagChatModel());
 
     private RelayCommand? _initializeRagCommand;
     public RelayCommand InitializeRagCommand => _initializeRagCommand ??= new RelayCommand(_ => InitializeRag(), _ => CanInitializeRag);
@@ -864,12 +885,26 @@ RefreshCommands();
         }
     }
 
+    private void BrowseRagChatModel()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "GGUF Files (*.gguf)|*.gguf|All Files (*.*)|*.*",
+            Title = "Select RAG Chat Model (GGUF)"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            RagChatModelPath = dialog.FileName;
+        }
+    }
+
     private void InitializeRag()
     {
         try
         {
             LogInfo("Initializing RAG...");
-            RagService.Instance.Initialize(RagEmbeddingModelPath, ModelPath, RagContextSize, RagEmbeddingGpuLayerCount, RagChatGpuLayerCount, RagTemperature, RagMaxTokens);
+            RagService.Instance.Initialize(RagEmbeddingModelPath, RagChatModelPath, RagChatContextSize, RagEmbedContextSize, RagEmbeddingGpuLayerCount, RagChatGpuLayerCount, RagTemperature, RagMaxTokens);
             OnPropertyChanged(nameof(RagIsInitialized));
             OnPropertyChanged(nameof(CanInitializeRag));
             OnPropertyChanged(nameof(CanIngestDocuments));
