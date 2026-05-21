@@ -216,6 +216,209 @@
                 </Grid>
             </TabItem>
 
+            <!-- RAG Tab -->
+            <TabItem Header="RAG">
+                <TabControl Margin="4">
+                    <TabControl.Resources>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Padding" Value="8,4"/>
+                            <Setter Property="FontSize" Value="12"/>
+                        </Style>
+                    </TabControl.Resources>
+
+                    <!-- Information Sub-Tab -->
+                    <TabItem Header="Information">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                            <TextBlock TextWrapping="Wrap" FontSize="12" LineHeight="20">
+                                <Bold>Retrieval-Augmented Generation (RAG)</Bold> allows the bot to answer questions about your server by searching through provided documents, rather than feeding the entire document to the model.
+
+                                <LineBreak/><LineBreak/><Bold>How it works:</Bold>
+                                <LineBreak/>   1. Documents (wiki pages, rules, guides) are split into small paragraphs
+                                <LineBreak/>   2. An embedding model converts each paragraph into a mathematical vector
+                                <LineBreak/>   3. Vectors are stored in memory for fast retrieval
+                                <LineBreak/>   4. When a question is asked, the database finds the 3-4 most relevant paragraphs
+                                <LineBreak/>   5. Only those relevant paragraphs are sent to the main LLM to generate the answer
+
+                                <LineBreak/><LineBreak/><Bold>Benefits:</Bold>
+                                <LineBreak/>   • Faster responses — processing 500 tokens vs. 50,000+
+                                <LineBreak/>   • Lower VRAM usage — no need to fit your entire wiki in context
+                                <LineBreak/>   • Higher accuracy — the model focuses only on relevant information
+                                <LineBreak/>   • Cost effective — an 8B model on an 8GB GPU works comfortably
+
+                                <LineBreak/><LineBreak/><Bold>Models needed:</Bold>
+                                <LineBreak/>   • <Bold>Chat Model:</Bold> Your main LLM (loaded in the Model tab) — generates the final answer
+                                <LineBreak/>   • <Bold>Embedding Model:</Bold> A tiny model (~23MB) that converts text to searchable vectors
+
+                                <LineBreak/><LineBreak/><Bold>Getting Started:</Bold>
+                                <LineBreak/>   1. Go to the Embedding Model tab and download a small embedding model
+                                <LineBreak/>   2. Go to the Documents tab and add your text/markdown/PDF files
+                                <LineBreak/>   3. Click "Initialize RAG" to build the search engine
+                                <LineBreak/>   4. Click "Ingest" to process documents into the vector database
+                                <LineBreak/>   5. Test questions in the Test Query tab
+                            </TextBlock>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Embedding Model Sub-Tab -->
+                    <TabItem Header="Embedding Model">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                            <StackPanel>
+                                <TextBlock Text="This tiny model converts text into searchable vectors. Use a small model like all-MiniLM-L6-v2 (Q4_K_M, ~23MB). Larger embedding models offer marginal accuracy gains and are not recommended."
+                                           TextWrapping="Wrap" Margin="0,0,0,8" FontSize="11" Foreground="Gray"/>
+
+                                <GroupBox Header="Embedding Model" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <Label Content="Model File:" Padding="0,0,0,2"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{Binding RagEmbeddingModelPath, UpdateSourceTrigger=PropertyChanged}"
+                                                     VerticalContentAlignment="Center" IsReadOnly="True"
+                                                     TextWrapping="NoWrap" Padding="4,4"/>
+                                            <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
+                                                    Command="{Binding BrowseRagEmbeddingModelCommand}" Padding="6,4"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <GroupBox Header="Download Embedding Model" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <ComboBox ItemsSource="{Binding CuratedModelNames}"
+                                                  SelectedItem="{Binding SelectedCuratedModel}"
+                                                  VerticalContentAlignment="Center" Padding="4,4"/>
+                                        <Label Content="Or enter URL:" Padding="0,4,0,2"/>
+                                        <TextBox Text="{Binding CustomDownloadUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 VerticalContentAlignment="Center" Padding="4,4"/>
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100"
+                                                         Height="20" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0">
+                                                <Button Content="Download" Width="72" Padding="6,4"
+                                                        Command="{Binding DownloadModelCommand}"/>
+                                                <Button Content="Cancel" Width="56" Margin="4,0,0,0" Padding="6,4"
+                                                        Command="{Binding CancelDownloadCommand}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                    <ComboBox ItemsSource="{Binding ContextSizeOptions}"
+                                              Text="{Binding RagContextSizeText, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEditable="True" Width="80"
+                                              VerticalContentAlignment="Center" Padding="4,4"/>
+                                    <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                    <Slider Minimum="0" Maximum="99" Value="{Binding RagGpuLayerCount}"
+                                            Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding RagGpuLayerCount}" VerticalAlignment="Center"
+                                               Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button Content="Initialize RAG" Width="100" Padding="6,4"
+                                            Command="{Binding InitializeRagCommand}"/>
+                                    <TextBlock Text="{Binding RagStatusText}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Documents Sub-Tab -->
+                    <TabItem Header="Documents">
+                        <Grid Margin="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Add .txt, .md, or .pdf files containing server rules, guides, FAQs, or wiki pages."
+                                       TextWrapping="Wrap" Margin="0,0,0,4" FontSize="11" Foreground="Gray" Grid.Row="0"/>
+
+                            <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,4">
+                                <Button Content="Add..." Width="60" Padding="4,4"
+                                        Command="{Binding AddRagDocumentCommand}"/>
+                                <Button Content="Remove" Width="60" Margin="4,0,0,0" Padding="4,4"
+                                        Command="{Binding RemoveRagDocumentCommand}"
+                                        CommandParameter="{Binding SelectedItem, ElementName=RagDocumentsListBox}"/>
+                            </StackPanel>
+
+                            <ListBox Grid.Row="2" x:Name="RagDocumentsListBox"
+                                     ItemsSource="{Binding RagDocumentPaths}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,0,0,4"/>
+
+                            <Grid Grid.Row="3" Margin="0,4,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ProgressBar Value="{Binding IngestProgress}" Minimum="0" Maximum="100"
+                                             Height="20" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Ingest" Width="72" Margin="4,0,0,0" Padding="6,4"
+                                        Command="{Binding IngestDocumentsCommand}"/>
+                            </Grid>
+
+                            <TextBlock Grid.Row="4" Text="{Binding RagDocumentCount, StringFormat='Documents ingested: {0}'}"
+                                       FontWeight="SemiBold" Margin="0,4,0,0"/>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Test Query Sub-Tab -->
+                    <TabItem Header="Test Query">
+                        <Grid Margin="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Ask a test question:" Margin="0,0,0,4" FontWeight="SemiBold" Grid.Row="0"/>
+                            <Grid Grid.Row="1" Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding RagQuestion, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center" Padding="4,4"/>
+                                <Button Grid.Column="1" Content="Ask" Width="56" Margin="4,0,0,0" Padding="6,4"
+                                        Command="{Binding AskRagCommand}"/>
+                            </Grid>
+
+                            <TextBox Grid.Row="2" Text="{Binding RagAnswer, Mode=OneWay}"
+                                     TextWrapping="Wrap" AcceptsReturn="True"
+                                     IsReadOnly="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="12"
+                                     Padding="4" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="3" Text="Sources:" FontWeight="SemiBold" Margin="0,4,0,2"/>
+                            <TextBox Grid.Row="4" Text="{Binding RagSources, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="11"
+                                     Padding="4" MinLines="3" MaxLines="6"/>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </TabItem>
+
             <!-- Monitoring Tab -->
             <TabItem Header="Monitoring">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">

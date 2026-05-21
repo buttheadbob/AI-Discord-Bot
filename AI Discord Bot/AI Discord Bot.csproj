@@ -25,7 +25,9 @@
       <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
       <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
       <PackageReference Include="System.Management" Version="10.0.0" />
-      <PackageReference Include="SimpleDiscordDotNet" Version="1.10.10" />
+      <PackageReference Include="SimpleDiscordDotNet" Version="1.10.11" />
+      <PackageReference Include="Microsoft.KernelMemory.Core" Version="0.98.250508.3" />
+      <PackageReference Include="LLamaSharp.kernel-memory" Version="0.27.0" />
     </ItemGroup>
 
     <Target Name="RemoveNonWindowsRuntimes" AfterTargets="Publish">

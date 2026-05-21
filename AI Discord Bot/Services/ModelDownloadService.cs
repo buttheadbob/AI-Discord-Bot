@@ -30,6 +30,8 @@ public class ModelDownloadService
         ["Phi 3.1 Mini 4K (Q4_K_M)"] = "https://huggingface.co/bartowski/Phi-3.1-mini-4k-instruct-GGUF/resolve/main/Phi-3.1-mini-4k-instruct-Q4_K_M.gguf",
         ["Llama 3.1 8B (Q4_K_M)"] = "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
         ["SmolLM2 1.7B (Q4_K_M)"] = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q4_K_M.gguf",
+        ["all-MiniLM-L6-v2 (Q4_K_M) - Embedding"] = "https://huggingface.co/bartowski/all-MiniLM-L6-v2-GGUF/resolve/main/all-MiniLM-L6-v2-Q4_K_M.gguf",
+        ["bge-small-en-v1.5 (Q4_K_M) - Embedding"] = "https://huggingface.co/bartowski/bge-small-en-v1.5-GGUF/resolve/main/bge-small-en-v1.5-Q4_K_M.gguf",
     };
 
     public bool IsDownloading => _downloadCts is not null;

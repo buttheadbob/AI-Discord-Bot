@@ -19,6 +19,7 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly LlamaService _llama;
     private readonly ModelDownloadService _downloader;
     private readonly AnalysisService _analysis;
+    private readonly RagService _rag;
     private AppSettings _appSettings = new();
     private CancellationTokenSource? _saveCts;
     private readonly DispatcherTimer _statusTimer;
@@ -64,6 +65,8 @@ public class MainViewModel : INotifyPropertyChanged
             });
         };
 
+        _rag = new RagService();
+
         UpdateBufferStats();
 
         _statusTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal,
@@ -79,6 +82,12 @@ public class MainViewModel : INotifyPropertyChanged
 
     public async Task InitializeAsync()
     {
+        foreach (var path in _appSettings.RagDocumentPaths)
+        {
+            if (File.Exists(path) && !RagDocumentPaths.Contains(path))
+                RagDocumentPaths.Add(path);
+        }
+
         if (!string.IsNullOrWhiteSpace(_appSettings.BotToken))
         {
             await ConnectDiscordAsync();
@@ -388,6 +397,85 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    // --- RAG ---
+
+    public string RagEmbeddingModelPath
+    {
+        get => _appSettings.RagEmbeddingModelPath;
+        set { _appSettings.RagEmbeddingModelPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInitializeRag)); ScheduleSave(); }
+    }
+
+    public bool RagIsInitialized => _rag.IsInitialized;
+
+    public string RagStatusText => _rag.IsInitialized ? "● Initialized" : "○ Not initialized";
+
+    public bool CanInitializeRag => !_rag.IsInitialized && _llama.IsLoaded && !string.IsNullOrWhiteSpace(RagEmbeddingModelPath) && File.Exists(RagEmbeddingModelPath);
+
+    public int RagContextSize
+    {
+        get => _appSettings.RagContextSize;
+        set { _appSettings.RagContextSize = Math.Clamp(value, 1024, 262144); OnPropertyChanged(); OnPropertyChanged(nameof(RagContextSizeText)); ScheduleSave(); }
+    }
+
+    public string RagContextSizeText
+    {
+        get => RagContextSize.ToString();
+        set { if (int.TryParse(value, out var parsed)) RagContextSize = parsed; }
+    }
+
+    public int RagGpuLayerCount
+    {
+        get => _appSettings.RagGpuLayerCount;
+        set { _appSettings.RagGpuLayerCount = Math.Clamp(value, 0, 99); OnPropertyChanged(); ScheduleSave(); }
+    }
+
+    public int RagDocumentCount
+    {
+        get => _rag.DocumentCount;
+        set { OnPropertyChanged(); }
+    }
+
+    public ObservableCollection<string> RagDocumentPaths { get; } = [];
+
+    private string _ragQuestion = "";
+    public string RagQuestion
+    {
+        get => _ragQuestion;
+        set { _ragQuestion = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanAskRag)); }
+    }
+
+    public bool CanAskRag => _rag.IsInitialized && !string.IsNullOrWhiteSpace(_ragQuestion);
+
+    private string _ragAnswer = "";
+    public string RagAnswer
+    {
+        get => _ragAnswer;
+        set { _ragAnswer = value; OnPropertyChanged(); }
+    }
+
+    private string _ragSources = "";
+    public string RagSources
+    {
+        get => _ragSources;
+        set { _ragSources = value; OnPropertyChanged(); }
+    }
+
+    private bool _isIngesting;
+    public bool IsIngesting
+    {
+        get => _isIngesting;
+        set { _isIngesting = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanIngestDocuments)); }
+    }
+
+    public bool CanIngestDocuments => _rag.IsInitialized && RagDocumentPaths.Count > 0 && !_isIngesting;
+
+    private int _ingestProgress;
+    public int IngestProgress
+    {
+        get => _ingestProgress;
+        set { _ingestProgress = value; OnPropertyChanged(); }
+    }
+
     // --- Controls ---
 
     public int IntervalSeconds
@@ -490,6 +578,24 @@ public class MainViewModel : INotifyPropertyChanged
 
     private RelayCommand? _stopMonitoringCommand;
     public RelayCommand StopMonitoringCommand => _stopMonitoringCommand ??= new RelayCommand(_ => StopMonitoring(), _ => CanStop);
+
+    private RelayCommand? _browseRagEmbeddingModelCommand;
+    public RelayCommand BrowseRagEmbeddingModelCommand => _browseRagEmbeddingModelCommand ??= new RelayCommand(_ => BrowseRagEmbeddingModel());
+
+    private RelayCommand? _initializeRagCommand;
+    public RelayCommand InitializeRagCommand => _initializeRagCommand ??= new RelayCommand(_ => InitializeRag(), _ => CanInitializeRag);
+
+    private RelayCommand? _addRagDocumentCommand;
+    public RelayCommand AddRagDocumentCommand => _addRagDocumentCommand ??= new RelayCommand(_ => AddRagDocument());
+
+    private RelayCommand? _removeRagDocumentCommand;
+    public RelayCommand RemoveRagDocumentCommand => _removeRagDocumentCommand ??= new RelayCommand(param => RemoveRagDocument(param));
+
+    private RelayCommand? _ingestDocumentsCommand;
+    public RelayCommand IngestDocumentsCommand => _ingestDocumentsCommand ??= new RelayCommand(async _ => await IngestDocumentsAsync(), _ => CanIngestDocuments);
+
+    private RelayCommand? _askRagCommand;
+    public RelayCommand AskRagCommand => _askRagCommand ??= new RelayCommand(async _ => await AskRagAsync(), _ => CanAskRag);
 
     // --- Methods ---
 
@@ -699,6 +805,122 @@ RefreshCommands();
     private void CancelDownload()
     {
         _downloader.CancelDownload();
+    }
+
+    // --- RAG Methods ---
+
+    private void BrowseRagEmbeddingModel()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "GGUF Files (*.gguf)|*.gguf|All Files (*.*)|*.*",
+            Title = "Select Embedding Model (GGUF)"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            RagEmbeddingModelPath = dialog.FileName;
+        }
+    }
+
+    private void InitializeRag()
+    {
+        try
+        {
+            LogInfo("Initializing RAG...");
+            _rag.Initialize(RagEmbeddingModelPath, ModelPath, RagContextSize, RagGpuLayerCount);
+            OnPropertyChanged(nameof(RagIsInitialized));
+            OnPropertyChanged(nameof(CanInitializeRag));
+            OnPropertyChanged(nameof(CanIngestDocuments));
+            OnPropertyChanged(nameof(CanAskRag));
+            RefreshCommands();
+        }
+        catch (Exception ex)
+        {
+            LogError($"RAG initialization failed: {ex.Message}");
+        }
+    }
+
+    private void AddRagDocument()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Documents (*.txt;*.md;*.pdf)|*.txt;*.md;*.pdf|All Files (*.*)|*.*",
+            Title = "Add Document(s) for RAG",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            foreach (var path in dialog.FileNames)
+            {
+                if (!RagDocumentPaths.Contains(path))
+                    RagDocumentPaths.Add(path);
+            }
+            _appSettings.RagDocumentPaths = [..RagDocumentPaths];
+            ScheduleSave();
+            OnPropertyChanged(nameof(CanIngestDocuments));
+        }
+    }
+
+    private void RemoveRagDocument(object? param)
+    {
+        if (param is string path && RagDocumentPaths.Contains(path))
+        {
+            RagDocumentPaths.Remove(path);
+            _appSettings.RagDocumentPaths = [..RagDocumentPaths];
+            ScheduleSave();
+            OnPropertyChanged(nameof(CanIngestDocuments));
+        }
+    }
+
+    private async Task IngestDocumentsAsync()
+    {
+        try
+        {
+            IsIngesting = true;
+            IngestProgress = 0;
+            RefreshCommands();
+
+            var progress = new Progress<int>(p =>
+            {
+                Application.Current.Dispatcher.Invoke(() => IngestProgress = p);
+            });
+
+            await _rag.IngestDocumentsAsync(RagDocumentPaths, progress);
+
+            RagDocumentCount = _rag.DocumentCount;
+            OnPropertyChanged(nameof(RagDocumentCount));
+        }
+        catch (Exception ex)
+        {
+            LogError($"Ingestion failed: {ex.Message}");
+        }
+        finally
+        {
+            IsIngesting = false;
+            IngestProgress = 0;
+            RefreshCommands();
+        }
+    }
+
+    private async Task AskRagAsync()
+    {
+        try
+        {
+            LogInfo($"RAG query: {_ragQuestion}");
+            var answer = await _rag.AskAsync(_ragQuestion);
+            RagAnswer = answer.Result;
+            RagSources = answer.RelevantSources.Count > 0
+                ? string.Join("\n", answer.RelevantSources.Select(s => s.SourceName))
+                : "No sources returned.";
+            OnPropertyChanged(nameof(RagSources));
+        }
+        catch (Exception ex)
+        {
+            LogError($"RAG query failed: {ex.Message}");
+            RagAnswer = $"Error: {ex.Message}";
+        }
     }
 
     private void StartMonitoring()

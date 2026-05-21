@@ -39,4 +39,12 @@ public class AppSettings
     ];
 
     public string CustomRules { get; set; } = DefaultBotRules.Text;
+
+    public string RagEmbeddingModelPath { get; set; } = "";
+
+    public List<string> RagDocumentPaths { get; set; } = [];
+
+    public int RagContextSize { get; set; } = 4096;
+
+    public int RagGpuLayerCount { get; set; } = 0;
 }

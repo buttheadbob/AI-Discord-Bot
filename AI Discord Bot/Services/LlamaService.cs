@@ -34,6 +34,7 @@ public partial class LlamaService : IDisposable
     private bool _disposed;
 
     public bool IsLoaded => _model is not null;
+    public LLamaWeights? Weights => _model;
     public string ModelPath { get; private set; } = "";
     public string ActiveBackend { get; private set; } = "None";
     public int LoadedContextSize { get; private set; }
