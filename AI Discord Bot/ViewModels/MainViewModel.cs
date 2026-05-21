@@ -19,7 +19,6 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly LlamaService _llama;
     private readonly ModelDownloadService _downloader;
     private readonly AnalysisService _analysis;
-    private readonly RagService _rag;
     private AppSettings _appSettings = new();
     private CancellationTokenSource? _saveCts;
     private readonly DispatcherTimer _statusTimer;
@@ -64,8 +63,6 @@ public class MainViewModel : INotifyPropertyChanged
                 UpdateBufferStats();
             });
         };
-
-        _rag = new RagService();
 
         UpdateBufferStats();
 
@@ -119,6 +116,12 @@ public class MainViewModel : INotifyPropertyChanged
     public string BotStatus => _discord.IsConnected ? "● Online" : "○ Offline";
 
     public bool CanConnectDiscord => !_discord.IsConnected && !string.IsNullOrWhiteSpace(BotToken);
+
+    public string DevelopmentGuildId
+    {
+        get => _appSettings.DevelopmentGuildId;
+        set { _appSettings.DevelopmentGuildId = value; OnPropertyChanged(); ScheduleSave(); }
+    }
 
     // --- Channels ---
 
@@ -405,11 +408,11 @@ public class MainViewModel : INotifyPropertyChanged
         set { _appSettings.RagEmbeddingModelPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInitializeRag)); ScheduleSave(); }
     }
 
-    public bool RagIsInitialized => _rag.IsInitialized;
+    public bool RagIsInitialized => RagService.Instance.IsInitialized;
 
-    public string RagStatusText => _rag.IsInitialized ? "● Initialized" : "○ Not initialized";
+    public string RagStatusText => RagService.Instance.IsInitialized ? "● Initialized" : "○ Not initialized";
 
-    public bool CanInitializeRag => !_rag.IsInitialized && _llama.IsLoaded && !string.IsNullOrWhiteSpace(RagEmbeddingModelPath) && File.Exists(RagEmbeddingModelPath);
+    public bool CanInitializeRag => !RagService.Instance.IsInitialized && _llama.IsLoaded && !string.IsNullOrWhiteSpace(RagEmbeddingModelPath) && File.Exists(RagEmbeddingModelPath);
 
     public int RagContextSize
     {
@@ -423,15 +426,53 @@ public class MainViewModel : INotifyPropertyChanged
         set { if (int.TryParse(value, out var parsed)) RagContextSize = parsed; }
     }
 
-    public int RagGpuLayerCount
+    public int RagMaxTokens
     {
-        get => _appSettings.RagGpuLayerCount;
-        set { _appSettings.RagGpuLayerCount = Math.Clamp(value, 0, 99); OnPropertyChanged(); ScheduleSave(); }
+        get => _appSettings.RagMaxTokens;
+        set { _appSettings.RagMaxTokens = Math.Clamp(value, 128, 16384); OnPropertyChanged(); OnPropertyChanged(nameof(RagMaxTokensText)); ScheduleSave(); }
+    }
+
+    public string RagMaxTokensText
+    {
+        get => RagMaxTokens.ToString();
+        set { if (int.TryParse(value, out var parsed)) RagMaxTokens = parsed; }
+    }
+
+    public int RagEmbeddingGpuLayerCount
+    {
+        get => _appSettings.RagEmbeddingGpuLayerCount;
+        set { _appSettings.RagEmbeddingGpuLayerCount = Math.Clamp(value, 0, 99); OnPropertyChanged(); ScheduleSave(); }
+    }
+
+    public int RagChatGpuLayerCount
+    {
+        get => _appSettings.RagChatGpuLayerCount;
+        set { _appSettings.RagChatGpuLayerCount = Math.Clamp(value, 0, 99); OnPropertyChanged(); ScheduleSave(); }
+    }
+
+    public float RagTemperature
+    {
+        get => _appSettings.RagTemperature;
+        set
+        {
+            _appSettings.RagTemperature = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(RagTemperatureText));
+            ScheduleSave();
+        }
+    }
+
+    public string RagTemperatureText => RagTemperature.ToString("F1");
+
+    public bool RagFlashAttention
+    {
+        get => _appSettings.RagFlashAttention;
+        set { _appSettings.RagFlashAttention = value; OnPropertyChanged(); ScheduleSave(); }
     }
 
     public int RagDocumentCount
     {
-        get => _rag.DocumentCount;
+        get => RagService.Instance.DocumentCount;
         set { OnPropertyChanged(); }
     }
 
@@ -444,7 +485,7 @@ public class MainViewModel : INotifyPropertyChanged
         set { _ragQuestion = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanAskRag)); }
     }
 
-    public bool CanAskRag => _rag.IsInitialized && !string.IsNullOrWhiteSpace(_ragQuestion);
+    public bool CanAskRag => RagService.Instance.IsInitialized && !string.IsNullOrWhiteSpace(_ragQuestion);
 
     private string _ragAnswer = "";
     public string RagAnswer
@@ -467,7 +508,7 @@ public class MainViewModel : INotifyPropertyChanged
         set { _isIngesting = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanIngestDocuments)); }
     }
 
-    public bool CanIngestDocuments => _rag.IsInitialized && RagDocumentPaths.Count > 0 && !_isIngesting;
+    public bool CanIngestDocuments => RagService.Instance.IsInitialized && RagDocumentPaths.Count > 0 && !_isIngesting;
 
     private int _ingestProgress;
     public int IngestProgress
@@ -609,7 +650,7 @@ public class MainViewModel : INotifyPropertyChanged
         try
         {
             LogInfo("Connecting to Discord...");
-            await _discord.ConnectAsync(BotToken);
+            await _discord.ConnectAsync(BotToken, DevelopmentGuildId);
             LogInfo("Bot connected");
             OnPropertyChanged(nameof(CanStart));
 RefreshCommands();
@@ -828,7 +869,7 @@ RefreshCommands();
         try
         {
             LogInfo("Initializing RAG...");
-            _rag.Initialize(RagEmbeddingModelPath, ModelPath, RagContextSize, RagGpuLayerCount);
+            RagService.Instance.Initialize(RagEmbeddingModelPath, ModelPath, RagContextSize, RagEmbeddingGpuLayerCount, RagChatGpuLayerCount, RagTemperature, RagMaxTokens);
             OnPropertyChanged(nameof(RagIsInitialized));
             OnPropertyChanged(nameof(CanInitializeRag));
             OnPropertyChanged(nameof(CanIngestDocuments));
@@ -887,9 +928,9 @@ RefreshCommands();
                 Application.Current.Dispatcher.Invoke(() => IngestProgress = p);
             });
 
-            await _rag.IngestDocumentsAsync(RagDocumentPaths, progress);
+            await RagService.Instance.IngestDocumentsAsync(RagDocumentPaths, progress);
 
-            RagDocumentCount = _rag.DocumentCount;
+            RagDocumentCount = RagService.Instance.DocumentCount;
             OnPropertyChanged(nameof(RagDocumentCount));
         }
         catch (Exception ex)
@@ -909,7 +950,7 @@ RefreshCommands();
         try
         {
             LogInfo($"RAG query: {_ragQuestion}");
-            var answer = await _rag.AskAsync(_ragQuestion);
+            var answer = await RagService.Instance.AskAsync(_ragQuestion);
             RagAnswer = answer.Result;
             RagSources = answer.RelevantSources.Count > 0
                 ? string.Join("\n", answer.RelevantSources.Select(s => s.SourceName))

@@ -32,14 +32,21 @@ public class DiscordBotService
         _monitoredChannelIds = channelIds;
     }
 
-    public async Task ConnectAsync(string token)
+    public async Task ConnectAsync(string token, string developmentGuildId = "")
     {
-        _bot = DiscordBot.NewBuilder()
+        var builder = DiscordBot.NewBuilder()
             .WithToken(token)
             .WithIntents(DiscordIntents.Guilds | DiscordIntents.GuildMessages | DiscordIntents.MessageContent | DiscordIntents.GuildMembers)
             .WithSynchronizationContext(SynchronizationContext.Current)
-            .WithPreloadOnStart(guilds: true, channels: true, members: false)
-            .Build();
+            .WithPreloadOnStart(guilds: true, channels: true, members: false);
+
+        if (!string.IsNullOrWhiteSpace(developmentGuildId))
+        {
+            builder.WithDevelopmentMode(true)
+                   .WithDevelopmentGuild(developmentGuildId);
+        }
+
+        _bot = builder.Build();
 
         DiscordEvents.MessageCreated += OnMessageCreated;
         DiscordEvents.Log += OnLog;

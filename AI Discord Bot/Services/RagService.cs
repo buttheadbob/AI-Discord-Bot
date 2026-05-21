@@ -7,12 +7,14 @@ using AI_Discord_Bot.Models;
 
 namespace AI_Discord_Bot.Services;
 
-public class RagService : IDisposable
+public class RagService
 {
+    public static RagService Instance { get; } = new();
+
     private MemoryServerless? _memory;
+    private readonly SemaphoreSlim _lock = new(1, 1);
     private string _embedModelPath = "";
     private string _chatModelPath = "";
-    private bool _disposed;
 
     public bool IsInitialized => _memory is not null;
     public int DocumentCount { get; private set; }
@@ -21,45 +23,54 @@ public class RagService : IDisposable
 
     public event Action<string, LogLevel>? LogMessage;
 
-    public void Initialize(string embedModelPath, string chatModelPath, int contextSize = 4096, int gpuLayerCount = 0)
+    public void Initialize(string embedModelPath, string chatModelPath, int contextSize = 4096, int embedGpuLayerCount = 0, int chatGpuLayerCount = 25, float temperature = 0.3f, int maxTokens = 4096)
     {
-        if (_memory is not null)
-            _memory = null;
-
-        if (!File.Exists(embedModelPath))
-            throw new FileNotFoundException("Embedding model not found.", embedModelPath);
-
-        if (!File.Exists(chatModelPath))
-            throw new FileNotFoundException("Chat model not found.", chatModelPath);
-
-        _embedModelPath = embedModelPath;
-        _chatModelPath = chatModelPath;
-
-        var embedConfig = new LLamaSharpConfig(embedModelPath)
+        _lock.Wait();
+        try
         {
-            GpuLayerCount = gpuLayerCount
-        };
-        var chatConfig = new LLamaSharpConfig(chatModelPath)
-        {
-            ContextSize = (uint)contextSize,
-            DefaultInferenceParams = new InferenceParams
+            if (_memory is not null)
+                _memory = null;
+
+            if (!File.Exists(embedModelPath))
+                throw new FileNotFoundException("Embedding model not found.", embedModelPath);
+
+            if (!File.Exists(chatModelPath))
+                throw new FileNotFoundException("Chat model not found.", chatModelPath);
+
+            _embedModelPath = embedModelPath;
+            _chatModelPath = chatModelPath;
+
+            var embedConfig = new LLamaSharpConfig(embedModelPath)
             {
-                MaxTokens = 2048,
-                AntiPrompts = ["\n\n\n", "\n###", "<|im_end|>"],
-                SamplingPipeline = new DefaultSamplingPipeline
+                GpuLayerCount = embedGpuLayerCount
+            };
+            var chatConfig = new LLamaSharpConfig(chatModelPath)
+            {
+                ContextSize = (uint)contextSize,
+                GpuLayerCount = chatGpuLayerCount,
+                DefaultInferenceParams = new InferenceParams
                 {
-                    Temperature = 0.3f,
-                    RepeatPenalty = 1.2f
+                    MaxTokens = maxTokens,
+                    AntiPrompts = ["\n\n\n", "<|im_end|>", "\nQuestion:", "\nAnswer:", ". Question:", ". Answer:"],
+                    SamplingPipeline = new DefaultSamplingPipeline
+                    {
+                        Temperature = temperature,
+                        RepeatPenalty = 1.35f
+                    }
                 }
-            }
-        };
+            };
 
-        var builder = new KernelMemoryBuilder();
-        builder.WithLLamaSharpTextEmbeddingGeneration(embedConfig);
-        builder.WithLLamaSharpTextGeneration(chatConfig);
-        _memory = builder.Build<MemoryServerless>();
+            var builder = new KernelMemoryBuilder();
+            builder.WithLLamaSharpTextEmbeddingGeneration(embedConfig);
+            builder.WithLLamaSharpTextGeneration(chatConfig);
+            _memory = builder.Build<MemoryServerless>();
 
-        LogMessage?.Invoke($"RAG initialized. Embedding: {Path.GetFileName(embedModelPath)}, Chat: {Path.GetFileName(chatModelPath)}", LogLevel.Info);
+            LogMessage?.Invoke($"RAG initialized. Embedding: {Path.GetFileName(embedModelPath)}, Chat: {Path.GetFileName(chatModelPath)}", LogLevel.Info);
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     public async Task IngestDocumentsAsync(IEnumerable<string> filePaths, IProgress<int>? progress = null)
@@ -67,26 +78,38 @@ public class RagService : IDisposable
         if (_memory is null)
             throw new InvalidOperationException("RAG not initialized.");
 
+        var mem = _memory;
         var paths = filePaths.ToList();
-        var count = 0;
 
-        foreach (var path in paths)
+        await Task.Run(() =>
         {
-            if (!File.Exists(path))
+            _lock.Wait();
+            try
             {
-                LogMessage?.Invoke($"Document not found: {path}", LogLevel.Warning);
-                continue;
+                var count = 0;
+                foreach (var path in paths)
+                {
+                    if (!File.Exists(path))
+                    {
+                        LogMessage?.Invoke($"Document not found: {path}", LogLevel.Warning);
+                        continue;
+                    }
+
+                    var docId = Path.GetFileNameWithoutExtension(path) + "_" + Guid.NewGuid().ToString("N")[..8];
+                    mem.ImportDocumentAsync(path, documentId: docId).GetAwaiter().GetResult();
+                    count++;
+                    LogMessage?.Invoke($"Ingested: {Path.GetFileName(path)}", LogLevel.Info);
+                    progress?.Report(count * 100 / paths.Count);
+                }
+
+                DocumentCount = count;
+                LogMessage?.Invoke($"Ingestion complete: {count} document(s)", LogLevel.Info);
             }
-
-            var docId = Path.GetFileNameWithoutExtension(path) + "_" + Guid.NewGuid().ToString("N")[..8];
-            await _memory.ImportDocumentAsync(path, documentId: docId);
-            count++;
-            LogMessage?.Invoke($"Ingested: {Path.GetFileName(path)}", LogLevel.Info);
-            progress?.Report(count * 100 / paths.Count);
-        }
-
-        DocumentCount = count;
-        LogMessage?.Invoke($"Ingestion complete: {count} document(s)", LogLevel.Info);
+            finally
+            {
+                _lock.Release();
+            }
+        });
     }
 
     public async Task<MemoryAnswer> AskAsync(string question)
@@ -94,16 +117,55 @@ public class RagService : IDisposable
         if (_memory is null)
             throw new InvalidOperationException("RAG not initialized.");
 
-        return await _memory.AskAsync(question);
+        var mem = _memory;
+
+        return await Task.Run(() =>
+        {
+            _lock.Wait();
+            try
+            {
+                var answer = mem.AskAsync(question).GetAwaiter().GetResult();
+                answer.Result = CleanAnswer(answer.Result);
+                return answer;
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        });
     }
 
-    public void Dispose()
+    private static string CleanAnswer(string result)
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (string.IsNullOrWhiteSpace(result))
+            return "";
 
-        _memory = null;
-        _embedModelPath = "";
-        _chatModelPath = "";
+        var qidx = result.LastIndexOf("\nQuestion:");
+        if (qidx < 0) qidx = result.LastIndexOf(". Question:");
+        if (qidx > 0)
+            result = result[..qidx];
+
+        var aidx = result.LastIndexOf("\nAnswer:");
+        if (aidx < 0) aidx = result.LastIndexOf(". Answer:");
+        if (aidx > 0)
+            result = result[..aidx];
+
+        result = result.Replace("INFO NOT FOUND", "");
+
+        result = result.Replace("Given only the facts above", "");
+        result = result.Replace("provide a comprehensive/detailed answer.", "");
+        result = result.Replace("You don't know where the knowledge comes from, just answer.", "");
+        result = result.Replace("If you don't have sufficient information, reply with ''.", "");
+
+        while (result.Contains("\n======\n"))
+            result = result.Replace("\n======\n", "\n");
+        result = result.Replace("\n======", "\n");
+
+        while (result.Contains("  "))
+            result = result.Replace("  ", " ");
+
+        result = result.Trim('=', '\n', '\r', ' ');
+
+        return string.IsNullOrWhiteSpace(result) ? "" : result;
     }
 }

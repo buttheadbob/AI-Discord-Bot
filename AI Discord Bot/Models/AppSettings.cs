@@ -4,6 +4,8 @@ public class AppSettings
 {
     public string BotToken { get; set; } = "";
 
+    public string DevelopmentGuildId { get; set; } = "";
+
     public List<string> MonitoredChannelIds { get; set; } = [];
 
     public string ReportChannelId { get; set; } = "";
@@ -46,5 +48,13 @@ public class AppSettings
 
     public int RagContextSize { get; set; } = 4096;
 
-    public int RagGpuLayerCount { get; set; } = 0;
+    public int RagMaxTokens { get; set; } = 4096;
+
+    public int RagEmbeddingGpuLayerCount { get; set; } = 0;
+
+    public int RagChatGpuLayerCount { get; set; } = 25;
+
+    public float RagTemperature { get; set; } = 0.3f;
+
+    public bool RagFlashAttention { get; set; } = true;
 }

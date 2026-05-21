@@ -85,6 +85,13 @@
                                     <TextBlock Text="{Binding BotStatus}" VerticalAlignment="Center" Margin="8,0,0,0"
                                                FontWeight="SemiBold"/>
                                 </StackPanel>
+
+                                <Separator Margin="0,8,0,6"/>
+                                <Label Content="Server ID (for instant /commands):" Padding="0,0,0,2"/>
+                                <TextBox Text="{Binding DevelopmentGuildId, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center" Padding="4,4"/>
+                                <TextBlock Text="Enter a server ID to enable instant command registration (developer mode). The /ask command will appear immediately after connecting."
+                                           TextWrapping="Wrap" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
@@ -147,9 +154,9 @@
                                                       IsEditable="True" Width="80"
                                                       VerticalContentAlignment="Center" Padding="4,4"/>
                                             <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
-                                        </StackPanel>
+                                </StackPanel>
 
-                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                             <Label Content="Temperature:" Padding="0,0,4,0" VerticalAlignment="Center"/>
                                             <Slider Minimum="0.1" Maximum="2.0" Value="{Binding Temperature}"
                                                     Width="120" IsSnapToTickEnabled="True" TickFrequency="0.1"
@@ -280,10 +287,62 @@
                                             <Button Grid.Column="1" Content="Browse..." Width="64" Margin="4,0,0,0"
                                                     Command="{Binding BrowseRagEmbeddingModelCommand}" Padding="6,4"/>
                                         </Grid>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0" Maximum="99" Value="{Binding RagEmbeddingGpuLayerCount}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding RagEmbeddingGpuLayerCount}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </GroupBox>
 
-                                <GroupBox Header="Download Embedding Model" Margin="0,0,0,8">
+                                <GroupBox Header="Chat Model" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <ComboBox ItemsSource="{Binding ContextSizeOptions}"
+                                                      Text="{Binding RagContextSizeText, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEditable="True" Width="80"
+                                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                                            <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Label Content="Max Tokens:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <ComboBox ItemsSource="{Binding ContextSizeOptions}"
+                                                      Text="{Binding RagMaxTokensText, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEditable="True" Width="80"
+                                                      VerticalContentAlignment="Center" Padding="4,4"/>
+                                            <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0" Maximum="99" Value="{Binding RagChatGpuLayerCount}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding RagChatGpuLayerCount}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Label Content="Temperature:" Padding="0,0,4,0" VerticalAlignment="Center"/>
+                                            <Slider Minimum="0.1" Maximum="2.0" Value="{Binding RagTemperature}"
+                                                    Width="120" IsSnapToTickEnabled="True" TickFrequency="0.1"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding RagTemperatureText}" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
+                                        </StackPanel>
+
+                                        <CheckBox Content="Flash Attention" IsChecked="{Binding RagFlashAttention}"
+                                                  Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <GroupBox Header="Download Model" Margin="0,0,0,8">
                                     <StackPanel>
                                         <ComboBox ItemsSource="{Binding CuratedModelNames}"
                                                   SelectedItem="{Binding SelectedCuratedModel}"
@@ -307,24 +366,6 @@
                                         </Grid>
                                     </StackPanel>
                                 </GroupBox>
-
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                    <Label Content="Context:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                                    <ComboBox ItemsSource="{Binding ContextSizeOptions}"
-                                              Text="{Binding RagContextSizeText, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEditable="True" Width="80"
-                                              VerticalContentAlignment="Center" Padding="4,4"/>
-                                    <Label Content="tokens" Padding="4,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                    <Label Content="GPU Layers:" Padding="0,0,4,0" VerticalAlignment="Center"/>
-                                    <Slider Minimum="0" Maximum="99" Value="{Binding RagGpuLayerCount}"
-                                            Width="120" IsSnapToTickEnabled="True" TickFrequency="1"
-                                            VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding RagGpuLayerCount}" VerticalAlignment="Center"
-                                               Margin="6,0,0,0" Width="24" TextAlignment="Right"/>
-                                </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                     <Button Content="Initialize RAG" Width="100" Padding="6,4"
